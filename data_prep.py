@@ -149,6 +149,7 @@ def feature_engineering(df_list):
 model_data_list_engineered = feature_engineering(model_data_list)
 
 # Concatenate all dataframes into a single dataframe
-output_df = pd.concat(model_data_list_engineered, axis=0)
-output_df.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\engineered_data.csv", index=False)
-print("Imported Successfully")
+# output_df = pd.concat(model_data_list_engineered, axis=0)
+# output_df.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\engineered_data.csv", index=False)
+# print("Imported Successfully")
+print("Script ran successfully")
