@@ -10,7 +10,7 @@ import joblib
 df_list = copy.deepcopy(model_data_list_engineered)
 
 # Importing pickle file with model and scaler objects
-model_objects, scaler_objects = joblib.load(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\models_and_scalers.pkl")
+model_objects, scaler_objects = joblib.load(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\models_and_scalers_2.pkl")
 
 def add_features_forecast(df, lags=[1, 2, 4, 8], rolling_windows=[2, 4, 8]):
     df = df.copy(deep=True)    
@@ -100,5 +100,5 @@ forecasted_df_list = forecast(df_list, model_objects, scaler_objects)
 
 forecasted_df_list_output = pd.concat(forecasted_df_list, axis=0)
 
-forecasted_df_list_output.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\forecasted_data.csv", index=False)
+forecasted_df_list_output.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\forecasted_data_2.csv", index=False)
 print("Finished_Export")

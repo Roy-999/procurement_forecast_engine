@@ -83,6 +83,6 @@ def main_call(df_list):
 model_objects_list, scaler_objects_list = main_call(df_list)
 
 # Save models and scalers using joblib
-joblib.dump((model_objects_list, scaler_objects_list), r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\models_and_scalers.pkl")
+joblib.dump((model_objects_list, scaler_objects_list), r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\models_and_scalers_2.pkl")
 
 print("Successfully saved models and scalers")

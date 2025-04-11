@@ -1,3 +1,4 @@
+from data_ingestion import data
 import pandas as pd
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
@@ -6,22 +7,125 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
-def load_data(file_path = r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\data_filtered_cleaned.csv"):
-    
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"The file {file_path} does not exist.")
-    
-    return pd.read_csv(file_path)
+# Removing Duplicates
+data.drop_duplicates(inplace=True)
 
-df = load_data()
+# Setting global max_date
+data['COLLECTION_DATE'] = pd.to_datetime(data['COLLECTION_DATE'])
+global_max_date = data['COLLECTION_DATE'].max()
+
+# Filtering in non-zero recommended_total_qty records
+data = data[data["RECOMMENDED_TOTAL_QTY"] > 0]
+
+# Splitting CATEGORY_NAME into four new columns
+split_cols = data['CATEGORY_NAME'].str.split('.', expand=True)
+split_cols.columns = ['CN_1', 'CN_2', 'CN_3', 'CN_4']
+
+# Efficiently concatenate the new columns after CATEGORY_NAME
+col_position = data.columns.get_loc('CATEGORY_NAME') + 1  # Position after CATEGORY_NAME
+data = pd.concat([data.iloc[:, :col_position], split_cols, data.iloc[:, col_position:]], axis=1)
+
+data.columns = data.columns.str.lower()
+
+# Casting columns to appropriate datatypes
+data = data.astype({'recommended_total_qty':'float', 'item_code':'str', 'cn_1':'str', 'cn_2':'str', 'cn_3':'str', 'cn_4':'str', 'uom':'str'})
+data['cn_4'] = data['cn_4'].fillna('NA')
+
+# CONDITION 1(ACTIVE ITEMS): Items ordered (non-zero) atleast once in past 3 months (at plant level considering global "max_date")
+
+def active_item_filter(df, lookback):
+    df_list = []
+    df = df.copy(deep=True)
+    lookback_dt = global_max_date - pd.DateOffset(months = lookback)
+    for org in df['org'].unique():
+        df_org = df[df['org']==org]
+        filtered_items = df_org[(df_org['collection_date']>=lookback_dt) & (df_org['collection_date']<=global_max_date)]['item_code'].unique()
+        df_org = df_org[df_org['item_code'].isin(filtered_items)]
+        if df_org.shape[0]>0:
+            df_list.append(df_org)
+            # print(f'org: {df_org["org"].unique()} :: Items: {df_org["item_code"].nunique()} :: Max order date: {df_org["collection_date"].max()}')
+        else:
+            continue
+    return df_list
+
+data_list = active_item_filter(data, 3) #(dataframe, lookback in months)
+f_data = pd.concat(data_list, axis=0)
+
+
+## CONDITION 2(ORDER FREQUENCY THRESHOLD): Items ordered (non-zero) atleast X times in past Y months (at plant level considering global "max_date")
+
+def order_freq_filter(df, threshold, lookback):
+    df_list = []
+    df = df.copy()
+    lookback_dt = global_max_date - pd.DateOffset(months = lookback)
+
+    for org in df['org'].unique():
+        df_org = df[df['org']==org]
+        df_org_temp = df_org[(df_org['collection_date']>=lookback_dt) & (df_org['collection_date']<=global_max_date)]
+        df_org_temp_item_order_freq = df_org_temp.groupby('item_code').size().reset_index(name="order_frequency")
+        filtered_items = df_org_temp_item_order_freq[df_org_temp_item_order_freq["order_frequency"] >= threshold]["item_code"].unique()
+        df_org = df_org[df_org["item_code"].isin(filtered_items)]
+        
+        if df_org.shape[0]>0:
+            df_list.append(df_org)
+            # print(f'org: {df_org["org"].unique()} :: Items: {df_org["item_code"].nunique()}')
+        else:
+            continue
+    
+    print(f'Total Plants: {len(df_list)}')
+    return df_list
+
+data_list = order_freq_filter(f_data, 10, 12)
+f_data = pd.concat(data_list, axis=0)
+
+# Making item dependent mapping consistent based on the latest captured value
+
+def fix_anomalous_values(f_data, columns_to_fix):
+
+    f_data = f_data.copy()
+
+    affected_item_codes = set()
+    
+    for col in columns_to_fix:
+        t = f_data.drop_duplicates(subset=['item_code', col])
+        t2 = t.groupby('item_code')[col].nunique().reset_index(name=f'unique_{col}_count')
+        anomalous_items = t2[t2[f'unique_{col}_count'] > 1]['item_code'].unique()
+        affected_item_codes.update(anomalous_items)
+
+    # Step 2: Get the latest values for affected item_codes
+    latest_values = f_data[f_data['item_code'].isin(affected_item_codes)] \
+                    .sort_values(by=['item_code', 'collection_date'], ascending=[True, False]) \
+                    .drop_duplicates(subset=['item_code'])[['item_code'] + columns_to_fix]
+
+    # Step 3: Convert latest values into mapping dictionaries
+    latest_value_dicts = {col: dict(zip(latest_values['item_code'], latest_values[col])) for col in columns_to_fix}
+
+    # Step 4: Apply fixes in the original data
+    for col in columns_to_fix:
+        f_data.loc[f_data['item_code'].isin(affected_item_codes), col] = f_data['item_code'].map(latest_value_dicts[col])
+
+    return f_data
+
+columns_to_fix = ['cn_4', 'cn_2', 'description']
+f_data_cleaned = fix_anomalous_values(f_data, columns_to_fix)
+
+df = f_data_cleaned
+
+# def load_data(file_path = r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\data_filtered_cleaned.csv"):
+    
+#     if not os.path.exists(file_path):
+#         raise FileNotFoundError(f"The file {file_path} does not exist.")
+    
+#     return pd.read_csv(file_path)
+
+# df = load_data()
+
 
 # Assign dtypes to columns
-df["collection_date"] = pd.to_datetime(df["collection_date"])
-df["recommended_total_qty"] = df["recommended_total_qty"].astype(float)
-df["item_code"] = df["item_code"].astype(str)
+# df["collection_date"] = pd.to_datetime(df["collection_date"])
+# df["recommended_total_qty"] = df["recommended_total_qty"].astype(float)
+# df["item_code"] = df["item_code"].astype(str)
 
-# Drop duplicates if any
-df.drop_duplicates(inplace=True)
 df.drop(columns=["category_name","cn_1","cn_3","cn_4","description","run_period","run_no"], inplace=True)
 
 # Cleaning string type features
@@ -149,7 +253,8 @@ def feature_engineering(df_list):
 model_data_list_engineered = feature_engineering(model_data_list)
 
 # Concatenate all dataframes into a single dataframe
-# output_df = pd.concat(model_data_list_engineered, axis=0)
-# output_df.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\engineered_data.csv", index=False)
-# print("Imported Successfully")
-print("Script ran successfully")
+output_df = pd.concat(model_data_list_engineered, axis=0)
+output_df.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\engineered_data_2.csv", index=False)
+print("Imported Successfully")
+
+print("data_prep ran successfully")
