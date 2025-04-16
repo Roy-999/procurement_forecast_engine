@@ -2,11 +2,15 @@ import oci
 import pandas as pd
 import io
 import concurrent.futures
+from pathlib import Path
 
 # Set up OCI config, the values are generated upon generating API key
+current_dir = Path(__file__).resolve().parent
+secret_file_path = current_dir / ".." / "source_files" / "swapnil.roy@infolob.com_2025-02-28T11_09_10.611Z.pem"
+secret_file_path = secret_file_path.resolve()
 config = {
     "user": "ocid1.user.oc1..aaaaaaaabepmp6cnh7quc2kq2lp65bg5zoaaafb3i6ysliw4xtsolf5245pq", 
-    "key_file": "swapnil.roy@infolob.com_2025-02-28T11_09_10.611Z.pem",
+    "key_file": secret_file_path,
     "tenancy": "ocid1.tenancy.oc1..aaaaaaaamvz6uy5l5mdihzdqex43sp3kwdg45hzhm5djvfiqf2aq2fusbb4q", 
     "fingerprint": "54:d0:cd:22:ea:f1:2f:ca:01:62:de:58:57:0a:7d:76",
     "region": "ap-mumbai-1"
@@ -56,4 +60,6 @@ if df_list:
 else:
     print("No valid CSV files found!")
 
-print("data_ingestion ran successfully")
+
+print("data_ingestion successful")
+

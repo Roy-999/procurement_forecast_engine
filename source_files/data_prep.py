@@ -72,7 +72,6 @@ def order_freq_filter(df, threshold, lookback):
         else:
             continue
     
-    print(f'Total Plants: {len(df_list)}')
     return df_list
 
 data_list = order_freq_filter(f_data, 10, 12)
@@ -111,21 +110,6 @@ f_data_cleaned = fix_anomalous_values(f_data, columns_to_fix)
 
 df = f_data_cleaned
 
-# def load_data(file_path = r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\data_filtered_cleaned.csv"):
-    
-#     if not os.path.exists(file_path):
-#         raise FileNotFoundError(f"The file {file_path} does not exist.")
-    
-#     return pd.read_csv(file_path)
-
-# df = load_data()
-
-
-# Assign dtypes to columns
-# df["collection_date"] = pd.to_datetime(df["collection_date"])
-# df["recommended_total_qty"] = df["recommended_total_qty"].astype(float)
-# df["item_code"] = df["item_code"].astype(str)
-
 df.drop(columns=["category_name","cn_1","cn_3","cn_4","description","run_period","run_no"], inplace=True)
 
 # Cleaning string type features
@@ -136,6 +120,11 @@ df['cn_2'] = df['cn_2'].str.upper()
 df['cn_2'] = df['cn_2'].str.strip()
 df['item_code'] = df['item_code'].str.upper()
 df['item_code'] = df['item_code'].str.strip()
+
+# Maintain a list of min_date at plant level to map week_numbers against week_start_date
+min_date_map = df.groupby('org')['collection_date'].min().reset_index()
+min_date_map.rename(columns={'collection_date': 'min_date'}, inplace=True)
+min_date_map['min_date'] = pd.to_datetime(min_date_map['min_date'].dt.date)
 
 # Complete time series sequence
 
@@ -252,9 +241,4 @@ def feature_engineering(df_list):
 
 model_data_list_engineered = feature_engineering(model_data_list)
 
-# Concatenate all dataframes into a single dataframe
-output_df = pd.concat(model_data_list_engineered, axis=0)
-output_df.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\engineered_data_2.csv", index=False)
-print("Imported Successfully")
-
-print("data_prep ran successfully")
+print("data_prep successful")

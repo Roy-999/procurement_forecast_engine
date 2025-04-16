@@ -1,16 +1,36 @@
-from data_prep import model_data_list_engineered
+# Ask if model need to be retrained before forecasting or not
+# train = int(input("Press 1 to retrain the model before generating forecast, else 0: "))
+
+import sys
+train = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+
+if train==1:
+    print("Running training sequence")
+    from training import dummy_variable
+else:
+    print("Running only forecasting sequence")
+
+from datetime import datetime
+from data_prep import model_data_list_engineered, min_date_map
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 import copy
 import joblib
+from pathlib import Path
 
 # Save a copy of imported metadata
 df_list = copy.deepcopy(model_data_list_engineered)
 
 # Importing pickle file with model and scaler objects
-model_objects, scaler_objects = joblib.load(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\models_and_scalers_2.pkl")
+
+current_dir = Path(__file__).resolve().parent
+model_path = current_dir / ".." / "source_files" / "trained_model" / "models_and_scalers.pkl"
+model_path = model_path.resolve()
+
+# Load models and scalers
+model_objects, scaler_objects = joblib.load(model_path)
 
 def add_features_forecast(df, lags=[1, 2, 4, 8], rolling_windows=[2, 4, 8]):
     df = df.copy(deep=True)    
@@ -87,6 +107,8 @@ def recursive_forecast(df, model, scaler, lead_time=4):
         # Update target variable in the original dataset for the next iteration
         df.loc[df["week_number"] == week, "recommended_total_qty"] = predictions
 
+    df = df[df["week_number"].isin(forecast_weeks)]
+
     return df
 
 def forecast(df_list, model_objects, scaler_objects):
@@ -99,6 +121,26 @@ forecasted_df_list = forecast(df_list, model_objects, scaler_objects)
 
 
 forecasted_df_list_output = pd.concat(forecasted_df_list, axis=0)
+forecasted_df_list_output["run_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-forecasted_df_list_output.to_csv(r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\forecasted_data_2.csv", index=False)
-print("Finished_Export")
+# Calculate week_start_date based on week_number
+
+def calculate_week_start_date(df):
+    temp = df[["org","week_number"]].drop_duplicates()
+    merge_min_date = pd.merge(temp, min_date_map, on=["org"], how="left")
+    merge_min_date["start_week_date"] = (merge_min_date["min_date"] + pd.to_timedelta((merge_min_date["week_number"] - 1) * 7, unit="D")).dt.date
+    df = pd.merge(df, merge_min_date[["org","week_number","start_week_date"]], on=["org","week_number"], how="left")
+    return df
+
+forecasted_df_list_output = calculate_week_start_date(forecasted_df_list_output)
+
+forecasted_df_list_output = forecasted_df_list_output[["run_date", "org", "item_code", "week_number", "start_week_date", "recommended_total_qty"]]
+
+# Include the run timestamp
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+file_name = fr"forecast_{timestamp}.csv"
+forecast_file_path = current_dir / ".." / "forecasted_data" / file_name
+forecast_file_path = forecast_file_path.resolve()
+forecasted_df_list_output.to_csv(forecast_file_path, index=False)
+
+print("Forecast Generated")

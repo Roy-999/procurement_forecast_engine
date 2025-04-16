@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 import copy
 import joblib
+from pathlib import Path
 
 # Save a copy of imported metadata
 df_list = copy.deepcopy(model_data_list_engineered)
@@ -83,6 +84,11 @@ def main_call(df_list):
 model_objects_list, scaler_objects_list = main_call(df_list)
 
 # Save models and scalers using joblib
-joblib.dump((model_objects_list, scaler_objects_list), r"C:\Lappy\Swapnil\ByteIQ\Motherson_Group\models_and_scalers_2.pkl")
+current_dir = Path(__file__).resolve().parent
+trained_model_path = current_dir / ".." / "source_files" / "trained_model" / "models_and_scalers.pkl"
+trained_model_path = trained_model_path.resolve()
+joblib.dump((model_objects_list, scaler_objects_list), trained_model_path)
 
-print("Successfully saved models and scalers")
+print("Training successful")
+
+dummy_variable = False
