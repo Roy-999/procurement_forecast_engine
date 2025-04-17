@@ -1,4 +1,4 @@
-from data_ingestion import data
+from data_ingestion_ADW import data
 import pandas as pd
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
