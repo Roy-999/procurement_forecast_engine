@@ -30,7 +30,6 @@ file_list = [
     if obj.name.endswith(".csv")
 ]
 
-print(f"Found {len(file_list)} CSV files in {folder_prefix}")
 
 # Function to fetch and read CSV as a DataFrame
 def get_csv_as_dataframe(object_name):
@@ -52,14 +51,9 @@ df_list = [df for df in results if df is not None]
 # Combine all DataFrames
 if df_list:
     data = pd.concat(df_list, ignore_index=True)
-    print("Combined DataFrame Shape:", data.shape)
 
-    # Basic insights
-    print("Unique ORG values:", data["ORG"].nunique())
-    print("Unique ITEM_CODE values:", data["ITEM_CODE"].nunique())
 else:
-    print("No valid CSV files found!")
-
+    print("No valid data")
 
 print("data_ingestion successful")
 

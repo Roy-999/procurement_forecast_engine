@@ -10,7 +10,7 @@ if train==1:
 else:
     print("Running only forecasting sequence")
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from data_prep import model_data_list_engineered, min_date_map
 import pandas as pd
 import numpy as np
@@ -19,6 +19,10 @@ import xgboost as xgb
 import copy
 import joblib
 from pathlib import Path
+import os
+import oracledb
+from sqlalchemy import create_engine, text
+from sqlalchemy.types import String
 
 # Save a copy of imported metadata
 df_list = copy.deepcopy(model_data_list_engineered)
@@ -144,3 +148,58 @@ forecast_file_path = forecast_file_path.resolve()
 forecasted_df_list_output.to_csv(forecast_file_path, index=False)
 
 print("Forecast Generated")
+
+
+# PUSH TO ADW
+
+current_dir = Path(__file__).resolve().parent
+
+# Setup Oracle Client path
+os.environ["PATH"] = fr"{current_dir}\instantclient-basic-windows.x64-23.7.0.25.01\instantclient_23_7" + ";" + os.environ["PATH"]
+oracledb.init_oracle_client(lib_dir=fr"{current_dir}\instantclient-basic-windows.x64-23.7.0.25.01\instantclient_23_7")
+
+# SQLAlchemy connection string
+username = "mtsl_ppe_dev"
+password = "Motherson12345"
+dsn = "ppepocadw_high"
+wallet_password = "Motherson@12345"
+
+connection_string = f'oracle+oracledb://{username}:{password}@{dsn}?wallet_password={wallet_password}'
+engine = create_engine(connection_string)
+
+# Function to force all columns to String
+def all_string_dtypes(df):
+    return {col: String(255) for col in df.columns}
+
+# Table list and corresponding dataframes
+table_data_map = {
+    "FORECAST_TABLE": forecasted_df_list_output
+}
+
+drop = False  # Set to False if you want to append instead of dropping existing tables
+
+with engine.begin() as conn:
+    for table_name, df in table_data_map.items():
+        result = conn.execute(
+            text(f"SELECT COUNT(*) FROM user_tables WHERE table_name = UPPER('{table_name}')")
+        )
+        exists = result.scalar() > 0
+
+        if exists:
+            if drop:
+                print(f"Table {table_name} exists, dropping...")
+                conn.execute(text(f'DROP TABLE "{table_name}" CASCADE CONSTRAINTS PURGE'))
+                mode = "replace"
+            else:
+                print(f"Table {table_name} exists, appending...")
+                mode = "append"
+        else:
+            print(f"Creating table {table_name}...")
+            mode = "replace"
+
+        dtype_map = all_string_dtypes(df)
+        df.to_sql(table_name, con=conn, if_exists=mode, index=False, dtype=dtype_map)
+        # print(f"Loaded {len(df)} rows into {table_name}")
+
+print("Forecast pushed to ADW successfully on FORECAST_TABLE")
+

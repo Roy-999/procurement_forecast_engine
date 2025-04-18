@@ -7,6 +7,8 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
+data.columns = data.columns.str.upper()
+
 # Removing Duplicates
 data.drop_duplicates(inplace=True)
 
@@ -91,18 +93,18 @@ def fix_anomalous_values(f_data, columns_to_fix):
         anomalous_items = t2[t2[f'unique_{col}_count'] > 1]['item_code'].unique()
         affected_item_codes.update(anomalous_items)
 
-    # Step 2: Get the latest values for affected item_codes
     latest_values = f_data[f_data['item_code'].isin(affected_item_codes)] \
                     .sort_values(by=['item_code', 'collection_date'], ascending=[True, False]) \
                     .drop_duplicates(subset=['item_code'])[['item_code'] + columns_to_fix]
 
-    # Step 3: Convert latest values into mapping dictionaries
     latest_value_dicts = {col: dict(zip(latest_values['item_code'], latest_values[col])) for col in columns_to_fix}
 
-    # Step 4: Apply fixes in the original data
+    # for col in columns_to_fix:
+    #     f_data.loc[f_data['item_code'].isin(affected_item_codes), col] = f_data['item_code'].map(latest_value_dicts[col])
     for col in columns_to_fix:
-        f_data.loc[f_data['item_code'].isin(affected_item_codes), col] = f_data['item_code'].map(latest_value_dicts[col])
-
+        f_data.loc[f_data['item_code'].isin(affected_item_codes), col] = (
+        f_data.loc[f_data['item_code'].isin(affected_item_codes), 'item_code'].map(latest_value_dicts[col])
+    )
     return f_data
 
 columns_to_fix = ['cn_4', 'cn_2', 'description']
